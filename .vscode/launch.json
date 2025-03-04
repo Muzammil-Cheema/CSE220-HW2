@@ -1,0 +1,46 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Run Main",
+            "program": "${workspaceRoot}/build/hw2_main",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build",
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Run Part1 Tests",
+            "program": "${workspaceRoot}/build/part1",
+            "args": ["0"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build"
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Run Part2 Tests",
+            "program": "${workspaceRoot}/build/part2",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build"
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Run Part3 Tests",
+            "program": "${workspaceRoot}/build/part3",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build"
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Run Part4 Tests",
+            "program": "${workspaceRoot}/build/part_4_tests",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build"
+        },
+    ],
+}
