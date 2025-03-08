@@ -10,9 +10,41 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+/*
+Understanding the Aflent Protocol
+Array Number isn't useful
+Frag tells us which packet number we are at
+max_frag_size is how many payload bytes each packet can store
+Length or data_length is how many data values we need to hold in total
+*/
+
 //Packet Code:
 
-void print_packet(unsigned char packet[]){
+// //Take a char pointer and assigns 4 bytes of data, starting from where the ptr starts. The ptr is incremented 4 places. The order of data storage is based on the endianness. 
+// unsigned int set_data_32bit(const unsigned char* ptr, int endianness){
+// 	unsigned int value;
+// 	if (endianness){
+// 		value = (
+// 			(*ptr)		|
+// 			(*(ptr+1) << 8)	| 
+// 			(*(ptr+2) << 16)	|
+// 			(*(ptr+3) << 24)
+// 		);
+// 		ptr+=4;
+// 	} else {
+// 		value = (
+// 			(*(ptr) << 24)	|
+// 			(*(ptr+1) << 16)	| 
+// 			(*(ptr+2) << 8)	|
+// 			(*(ptr+3))
+// 		);
+// 		ptr+=4;
+// 	}
+// 	return value;
+// }
+
+void print_packet(unsigned char packet[])
+{
 	unsigned char array_number = packet[0] >> 2;
     unsigned char fragment_number = ((packet[0] & 0x03) << 3) | ((packet[1] & 0xE0) >> 5);
     unsigned short length = ((packet[1] & 0x1F) << 5) | ((packet[2] & 0xF8) >> 3);
@@ -53,16 +85,72 @@ void print_packet(unsigned char packet[]){
 
 		printf("%x ", value);
 	}
+
+	// free(dataPtr);
+	dataPtr = NULL;
 }
 
 unsigned char* build_packets(int data[], int data_length, int max_fragment_size, int endianness, int array_number)
 {
-	(void) data; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) data_length; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) max_fragment_size; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) endianness; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) array_number; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-    return NULL;
+	(void) data;
+	int total_packet_amount = (int) ceil(data_length * 4 / max_fragment_size);	//Number of packets needed
+	unsigned char *original_packet_ptr = (unsigned char*) calloc(total_packet_amount, 3 + max_fragment_size);	//Packet array pointer that will be returned (remains unmodified throughout function)
+	unsigned char *packet_ptr = original_packet_ptr;
+
+	int data_index = 0;	//Index of the current data value we are reading. Used to create multiple packets with new data. 
+	//For each packet...
+	for (int fragment_number = 0; fragment_number < total_packet_amount; fragment_number++, packet_ptr++){
+		unsigned short length = 0; //Equals the number of 32-bit values in a given payload. Stored in the header. 
+
+		//Stores data according to endianness. Values are stored until the number of values stored by the current packet reaches max_fragment_size or until there are no values left to store in the data int array. 
+		if (endianness){
+			for (int payload_location = 3; payload_location < max_fragment_size + 3 && data_index < data_length; payload_location+=4, data_index++, length++){
+				packet_ptr[payload_location] = data[data_index] & 0x000000FF;
+				packet_ptr[payload_location+1] = (data[data_index] & 0x0000FF00) >> 8;
+				packet_ptr[payload_location+2] = (data[data_index] & 0x00FF0000) >> 16;
+				packet_ptr[payload_location+3] = (data[data_index] & 0xFF000000) >> 24;
+			}
+		} else {
+			for (int payload_location = 3; payload_location < max_fragment_size + 3 && data_index < data_length; payload_location+=4, data_index++, length++){
+				packet_ptr[payload_location+3] = data[data_index] & 0x000000FF;
+				packet_ptr[payload_location+2] = (data[data_index] & 0x0000FF00) >> 8;
+				packet_ptr[payload_location+1] = (data[data_index] & 0x00FF0000) >> 16;
+				packet_ptr[payload_location] = (data[data_index] & 0xFF000000) >> 24;
+			}
+		}
+
+		//Sets the three header bytes for each packet
+		packet_ptr[0] = ((array_number & 0x3F) << 2) | ((fragment_number >> 3) & 0x3);
+		packet_ptr[1] = ((fragment_number & 0x7) << 5) | ((length >> 5) & 0x1F);
+		packet_ptr[2] = ((length & 0x1F) << 3) | 0 << 2 | endianness << 1 | 1;
+
+		// printf("HEADER 1: ");
+		// for (int i = 7; i >= 0; i--) {
+		// 	unsigned int bit = (packet_ptr[0] >> i) & 1;  // Shift the bit and mask to get the value (0 or 1)
+		// 	printf("%u", bit);
+		// }
+		// printf("\n");
+		// printf("HEADER 2: ");
+		// for (int i = 7; i >= 0; i--) {
+		// 	unsigned int bit = (packet_ptr[1] >> i) & 1;  // Shift the bit and mask to get the value (0 or 1)
+		// 	printf("%u", bit);
+		// }
+		// printf("\n");
+		// printf("HEADER 3: ");
+		// for (int i = 7; i >= 0; i--) {
+		// 	unsigned int bit = (packet_ptr[2] >> i) & 1;  // Shift the bit and mask to get the value (0 or 1)
+		// 	printf("%u", bit);
+		// }
+		// printf("\nPACKET NUMBER: %d\n", fragment_number);
+	}
+
+	// printf("ORIGINAL 1 %x\n", (unsigned int)original_packet_ptr[0]);
+	// printf("ORIGINAL 2 %x\n", (unsigned int)original_packet_ptr[1]);
+	// printf("ORIGINAL 3 %x\n", (unsigned int)original_packet_ptr[2]);
+
+	//Nullify obsolete pointers
+	packet_ptr = NULL;
+	return original_packet_ptr;
 }
 
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths)

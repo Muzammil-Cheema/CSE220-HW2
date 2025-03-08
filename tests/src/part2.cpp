@@ -49,6 +49,11 @@ TEST_F(part2_tests, BasicPacketFrag) //Two Fragments, 2 ints, no endian
     int values = 2;
     int max_frag = 4;
     output=build_packets(data,values,max_frag,0,6);
+    // print_packet(output);
+    // for (int i = 0; i < 3; i++){
+    //     printf("%x", output[i]);
+    // }
+    // print_packet(output+1);
     for (auto i = 0; i < length; ++i)
         ASSERT_EQ(output[i], expected[i]) << "Failed for byte " RED_MSG << std::hex << i << std::dec << COLOR_END;
 }
@@ -66,6 +71,8 @@ const unsigned char expected[1676]{0x98, 0x0, 0x40, 0xA, 0x9D, 0x34, 0x6C, 0x3C,
     }
     int max_frag = 32;
     unsigned char* output=build_packets(rand_data,values,max_frag,0,38);
+    // print_packet(output);
+    // print_packet(output+1);
     for (auto i = 0; i < length; ++i)
         ASSERT_EQ(output[i], expected[i]) << "Failed for byte " RED_MSG << std::hex << i << std::dec << COLOR_END;
 }
