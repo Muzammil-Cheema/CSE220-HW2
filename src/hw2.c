@@ -92,14 +92,13 @@ void print_packet(unsigned char packet[])
 
 unsigned char* build_packets(int data[], int data_length, int max_fragment_size, int endianness, int array_number)
 {
-	(void) data;
-	int total_packet_amount = (int) ceil(data_length * 4 / max_fragment_size);	//Number of packets needed
-	unsigned char *original_packet_ptr = (unsigned char*) calloc(total_packet_amount, 3 + max_fragment_size);	//Packet array pointer that will be returned (remains unmodified throughout function)
+	int total_fragments = (int) ceil(data_length * 4.0 / max_fragment_size);	//Number of packets needed
+	unsigned char *original_packet_ptr = (unsigned char*) calloc(total_fragments, 3 + max_fragment_size);	//Packet array pointer that will be returned (pointer unchanged in this function)
 	unsigned char *packet_ptr = original_packet_ptr;
 
 	int data_index = 0;	//Index of the current data value we are reading. Used to create multiple packets with new data. 
 	//For each packet...
-	for (int fragment_number = 0; fragment_number < total_packet_amount; fragment_number++, packet_ptr++){
+	for (int fragment_number = 0; fragment_number < total_fragments; fragment_number++, packet_ptr+=(3+max_fragment_size)){
 		unsigned short length = 0; //Equals the number of 32-bit values in a given payload. Stored in the header. 
 
 		//Stores data according to endianness. Values are stored until the number of values stored by the current packet reaches max_fragment_size or until there are no values left to store in the data int array. 
@@ -121,8 +120,25 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 
 		//Sets the three header bytes for each packet
 		packet_ptr[0] = ((array_number & 0x3F) << 2) | ((fragment_number >> 3) & 0x3);
+		// printf("fragment_number: %d (binary: ", fragment_number);
+		// for (int i = 7; i >= 0; i--) {
+		// 	printf("%u", (fragment_number >> i) & 1);
+		// }
+		// printf(")\n");
+
+		// printf("length: %d (binary: ", length);
+		// for (int i = 15; i >= 0; i--) {  // length is at most 16 bits
+		// 	printf("%u", (length >> i) & 1);
+		// }
+		// printf(")\n");
 		packet_ptr[1] = ((fragment_number & 0x7) << 5) | ((length >> 5) & 0x1F);
-		packet_ptr[2] = ((length & 0x1F) << 3) | 0 << 2 | endianness << 1 | 1;
+		// printf("header 2: %d (binary: ", packet_ptr[1]);
+		// for (int i = 7; i >= 0; i--) {  
+		// 	printf("%u", (packet_ptr[1] >> i) & 1);
+		// }
+		// printf(")\n");
+		// printf("FRAGMENT NUMBER: %d\n", fragment_number);
+		packet_ptr[2] = ((length & 0x1F) << 3) | 0 << 2 | endianness << 1 | (total_fragments == (fragment_number+1) ? 1 : 0);
 
 		// printf("HEADER 1: ");
 		// for (int i = 7; i >= 0; i--) {
@@ -142,11 +158,27 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 		// 	printf("%u", bit);
 		// }
 		// printf("\nPACKET NUMBER: %d\n", fragment_number);
+
+		// printf("ORIGINAL 1 %x\n", (unsigned int)original_packet_ptr[0]);
+		// printf("ORIGINAL 2 %x\n", (unsigned int)original_packet_ptr[1]);
+		// printf("ORIGINAL 3 %x\n", (unsigned int)original_packet_ptr[2]);
+		// printf("ORIGINAL 4 %x\n", (unsigned int)original_packet_ptr[3]);
+		// printf("ORIGINAL 5 %x\n", (unsigned int)original_packet_ptr[4]);
+		// printf("ORIGINAL 6 %x\n", (unsigned int)original_packet_ptr[5]);
+		// printf("ORIGINAL 7 %x\n", (unsigned int)original_packet_ptr[6]);
+		// printf("ORIGINAL 8 %x\n", (unsigned int)original_packet_ptr[7]);
+		// printf("ORIGINAL 9 %x\n", (unsigned int)original_packet_ptr[8]);
+		// printf("ORIGINAL 10 %x\n", (unsigned int)original_packet_ptr[9]);
+		// printf("ORIGINAL 11 %x\n", (unsigned int)original_packet_ptr[10]);
+		// printf("ORIGINAL 12 %x\n", (unsigned int)original_packet_ptr[11]);
+		// printf("ORIGINAL 13 %x\n", (unsigned int)original_packet_ptr[12]);
+		// printf("ORIGINAL 14 %x\n", (unsigned int)original_packet_ptr[13]);
+		// printf("ORIGINAL 15 %x\n", (unsigned int)original_packet_ptr[14]);
 	}
 
-	// printf("ORIGINAL 1 %x\n", (unsigned int)original_packet_ptr[0]);
-	// printf("ORIGINAL 2 %x\n", (unsigned int)original_packet_ptr[1]);
-	// printf("ORIGINAL 3 %x\n", (unsigned int)original_packet_ptr[2]);
+	
+
+
 
 	//Nullify obsolete pointers
 	packet_ptr = NULL;
