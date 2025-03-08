@@ -30,7 +30,7 @@ void print_packet(unsigned char packet[]){
 
 	unsigned char *dataPtr = &packet[3];
 
-	for (int i = 0; i < length; i+=4){
+	for (int i = 0; i < length; i++){
 		unsigned int value;
 
 		if (endianness){
