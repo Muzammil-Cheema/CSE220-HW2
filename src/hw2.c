@@ -12,9 +12,47 @@
 
 //Packet Code:
 
-void print_packet(unsigned char packet[])
-{
-	(void) packet; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
+void print_packet(unsigned char packet[]){
+	unsigned char array_number = packet[0] >> 2;
+    unsigned char fragment_number = ((packet[0] & 0x03) << 3) | ((packet[1] & 0xE0) >> 5);
+    unsigned short length = ((packet[1] & 0x1F) << 5) | ((packet[2] & 0xF8) >> 3);
+    unsigned char encrypted = (packet[2] & 0x04) >> 2;
+    unsigned char endianness = (packet[2] & 0x02) >> 1;
+    unsigned char last = packet[2] & 0x01;
+
+	printf("Array Number: %hhu\n", array_number);
+	printf("Fragment Number: %hhu\n", fragment_number);
+	printf("Length: %hu\n", length);
+	printf("Encrypted: %hhu\n", encrypted);
+	printf("Endianness: %hhu\n", endianness);
+	printf("Last: %hhu\n", last);
+	printf("Data: ");
+
+	unsigned char *dataPtr = &packet[3];
+
+	for (int i = 0; i < length; i+=4){
+		unsigned int value;
+
+		if (endianness){
+			value = (
+				(*dataPtr)		|
+				(*(dataPtr+1) << 8)	| 
+				(*(dataPtr+2) << 16)	|
+				(*(dataPtr+3) << 24)
+			);
+			dataPtr+=4;
+		} else {
+			value = (
+				(*(dataPtr) << 24)	|
+				(*(dataPtr+1) << 16)	| 
+				(*(dataPtr+2) << 8)	|
+				(*(dataPtr+3))
+			);
+			dataPtr+=4;
+		}
+
+		printf("%x ", value);
+	}
 }
 
 unsigned char* build_packets(int data[], int data_length, int max_fragment_size, int endianness, int array_number)
