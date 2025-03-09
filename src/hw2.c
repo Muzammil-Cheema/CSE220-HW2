@@ -12,7 +12,7 @@
 
 /*
 Understanding the Aflent Protocol
-Array Number isn't useful
+Array Number isn't useful until part 3
 Frag tells us which packet number we are at
 max_frag_size is how many payload bytes each packet can store
 Length or data_length is how many data values we need to hold in total
@@ -335,23 +335,11 @@ block_t mash(block_t x, block_t *keys)
 
 block_t sbu_encrypt_block(block_t plain_text, block_t *expanded_keys)
 {
-	// (void) plain_text;
-	// plain_text = 0x739192b5;
-	// printf("Current (R00): %x\n", plain_text);
 	block_t R01 = scramble(plain_text, expanded_keys, 0, reverse);
-	// printf("R01: %x\n", R01);
-	// block_t R01 = 0x7b57fb16;
-	// printf("R01: %x\n", R01);
 	block_t R02 = scramble(R01, expanded_keys, 1, shuffle1);
-	// printf("R02: %x\n", R02);
-	// block_t R02 = 0x17a08711;
-	// printf("R02: %x\n", R02);
 	block_t R03 = scramble(R02, expanded_keys, 2, shuffle4);
-	// printf("R03: %x\n", R03);
 	block_t R04 = scramble(R03, expanded_keys, 3, reverse);
-	// printf("R04: %x\n", R04);
 	block_t R05 = mash(R04, expanded_keys);
-	// printf("R05: %x\n", R05);
 
 	block_t R06 = scramble(R05, expanded_keys, 4, reverse);
 	block_t R07 = scramble(R06, expanded_keys, 5, shuffle1);
@@ -369,61 +357,114 @@ block_t sbu_encrypt_block(block_t plain_text, block_t *expanded_keys)
 	block_t R17 = scramble(R16, expanded_keys, 13, shuffle1);
 	block_t R18 = scramble(R17, expanded_keys, 14, shuffle4);
 	block_t R19 = scramble(R18, expanded_keys, 15, reverse);
-	// printf("R19: %x\n", R19);
-
 
     return R19;
 }
 
+int r_rot_table[] = {2, 3, 5, 7};
+
+uint8_t r_scramble_op(block_t B, uint8_t i, block_t keyA, block_t keyB)
+{
+    uint8_t B1 = rotr(nth_byte(B, i), r_rot_table[i]);
+    return B1 ^ (nth_byte(B, i-1) & nth_byte(B, i-2)) ^ (~nth_byte(B, i-1) & nth_byte(B, i-3)) ^ nth_byte(keyA, i) ^ nth_byte(keyB, i);
+}
+
 block_t r_scramble(block_t x, block_t *keys, uint32_t round, permute_func_t op)
 {
-	(void) x;
-	(void) keys;
-	(void) round;
-	(void) op;
-
-    return 0;
+	block_t keyA = keys[round];
+	block_t keyB = keys[31-round];
+	x = (x & ~0xFF000000) | (r_scramble_op(x, 3, keyA, keyB) << 24);
+    x = (x & ~0x00FF0000) | (r_scramble_op(x, 2, keyA, keyB) << 16);   
+	x = (x & ~0x0000FF00) | (r_scramble_op(x, 1, keyA, keyB) << 8);    
+	x = (x & ~0x000000FF) | r_scramble_op(x, 0, keyA, keyB);    
+	x = op(x);  
+    return x;
 }
 
 block_t r_mash(block_t x, block_t *keys)
 {
-	(void) x;
-	(void) keys;
-	return 0;
+	x = (x & ~0xFF000000) | (mash_op(x, 3, keys) << 24); 
+	x = (x & ~0x00FF0000) | (mash_op(x, 2, keys) << 16);
+	x = (x & ~0x0000FF00) | (mash_op(x, 1, keys) << 8);
+	x = (x & ~0x000000FF) | mash_op(x, 0, keys);
+    return x;
 }
 
 block_t sbu_decrypt_block(block_t cipher_text, block_t *expanded_keys)
 {
-	(void) cipher_text;
-	(void) expanded_keys;
-	return 0;
+	block_t R01 = r_scramble(cipher_text, expanded_keys, 15, reverse);
+	block_t R02 = r_scramble(R01, expanded_keys, 14, unshuffle4);
+	block_t R03 = r_scramble(R02, expanded_keys, 13, unshuffle1);
+	block_t R04 = r_scramble(R03, expanded_keys, 12, reverse);
+	block_t R05 = r_mash(R04, expanded_keys);
+
+	block_t R06 = r_scramble(R05, expanded_keys, 11, reverse);
+	block_t R07 = r_scramble(R06, expanded_keys, 10, unshuffle4);
+	block_t R08 = r_scramble(R07, expanded_keys, 9, unshuffle1);
+	block_t R09 = r_scramble(R08, expanded_keys, 8, reverse);
+	block_t R10 = r_mash(R09, expanded_keys);
+
+	block_t R11 = r_scramble(R10, expanded_keys, 7, reverse);
+	block_t R12 = r_scramble(R11, expanded_keys, 6, unshuffle4);
+	block_t R13 = r_scramble(R12, expanded_keys, 5, unshuffle1);
+	block_t R14 = r_scramble(R13, expanded_keys, 4, reverse);
+	block_t R15 = r_mash(R14, expanded_keys);
+
+	block_t R16 = r_scramble(R15, expanded_keys, 3, reverse);
+	block_t R17 = r_scramble(R16, expanded_keys, 2, unshuffle4);
+	block_t R18 = r_scramble(R17, expanded_keys, 1, unshuffle1);
+	block_t R19 = r_scramble(R18, expanded_keys, 0, reverse);
+
+    return R19;
 }
 
 void sbu_encrypt(uint8_t *plaintext_input, block_t *encrypted_output, size_t pt_len, uint32_t *expanded_keys)
 {
-	// *encrypted_output = (block_t*) calloc(ceil(pt_len / 4.0), sizeof(block_t));
-	block_t current = 0;
+	block_t current_block = 0;
 	int offset = (4 - (pt_len % 4)) % 4;
 
 	for (size_t i = 0; i < (pt_len+offset); i+=4){
-		current = 
+		current_block = 
 			plaintext_input[i]									|
 			(((i+1) < pt_len) ? plaintext_input[i+1] : 0) << 8	|
 			(((i+2) < pt_len) ? plaintext_input[i+2] : 0) << 16	|
 			(((i+3) < pt_len) ? plaintext_input[i+3] : 0) << 24	
 			;
 			
-		encrypted_output[i/4] = sbu_encrypt_block(current, expanded_keys);
+		encrypted_output[i/4] = sbu_encrypt_block(current_block, expanded_keys);
 		// printf("ENCRYPTED BLOCK %lu: %x\n", i/4, encrypted_output[i/4]);
 	}
 }
 
 void sbu_decrypt(block_t *encrypted_input, char *plaintext_output, size_t pt_len, uint32_t *expanded_keys)
 {
-	(void) encrypted_input;
-	(void) plaintext_output;
-	(void) pt_len;
-	(void) expanded_keys;
+	//First, second, third, fourth are in order of the characters in the decrypted plain text (first comes before second, which comes before third, etc.).
+	uint8_t first = 0;
+	uint8_t second = 0;
+	uint8_t third = 0;
+	uint8_t fourth = 0;
+	block_t current_block = 0;
+	int offset = (4 - (pt_len % 4)) % 4;
+
+	for (size_t i = 0; i < ((pt_len+offset)/4); i++){
+		current_block = sbu_decrypt_block(encrypted_input[i], expanded_keys);
+		fourth = (current_block & 0xFF000000) >> 24;
+		third = (current_block & 0xFF0000) >> 16;
+		second = (current_block & 0xFF00) >> 8;
+		first = current_block & 0xFF;
+
+		if (first){
+			plaintext_output[i*4] = first;
+			if (second){
+				plaintext_output[i*4+1] = second;
+				if (third){
+					plaintext_output[i*4+2] = third;
+					if (fourth)
+						plaintext_output[i*4+3] = fourth;
+				}
+			}
+		}
+	}
 }
 
 // ----------------- Utility Functions ----------------- //

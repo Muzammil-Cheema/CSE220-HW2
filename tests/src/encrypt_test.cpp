@@ -161,6 +161,8 @@ instructions for accessing and submitting homework assignments will be provided 
     uint8_t output[expected_string_size + OVERFLOW_BUFFER_SIZE]{ 0 };
 
     sbu_key_t key = 0x1ce30458e44aULL; // encode in base64 :)
+    // const sbu_key_t key = 0x02908278d78913b9;
+
     block_t key_sched[EXPANDED_KEYS_LENGTH]{ 0 };
     sbu_expand_keys(key, key_sched);
     sbu_decrypt(encrypted, output, expected_string_size, key_sched);
