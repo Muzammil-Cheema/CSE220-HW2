@@ -6,6 +6,8 @@
 
 
 int main() {
-	printf("Hello World\n");
+	for (int i = -7; i < 8; i++){
+        printf("%d mod 4 == %d\n", i, i%4);
+    }
     return 0;
 }

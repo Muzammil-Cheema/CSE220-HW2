@@ -35,12 +35,15 @@ Liberty to ourselves and our Posterity, do ordain and establish this Constitutio
     };
     constexpr auto expected_size = std::size(expected);
     const sbu_key_t key = 0x17880621;
+    // const sbu_key_t key = 0xab6176446f0c280a;
+
     
     block_t key_sched[EXPANDED_KEYS_LENGTH]{ 0 };
     block_t output[expected_size + OVERFLOW_BUFFER_SIZE]{ 0 };
 
     sbu_expand_keys(key, key_sched);
     sbu_encrypt(reinterpret_cast<uint8_t*>(message), output, sizeof(message), key_sched);
+    printf("OUTPUT BLOCK %d: %x\n", 0, output[0]);
 
     size_t idx = 0;
     for (; idx < expected_size; ++idx)
