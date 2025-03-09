@@ -223,61 +223,80 @@ block_t table[] = {
 
 uint8_t rotl(uint8_t x, uint8_t shamt)
 {
-	(void) x;
-	(void) shamt;
-    return 0;
+    return (x << (shamt%8)) | (x >> (8 - (shamt%8)));
 }
 
 uint8_t rotr(uint8_t x, uint8_t shamt)
 {
-	(void) x;
-	(void) shamt;
-    return 0;
+    return (x >> (shamt%8)) | (x << (8 - (shamt%8)));
 }
 
 block_t reverse(block_t x)
 {
-	(void) x;
-    return 0;
+	block_t reverse = 0;
+	for (int i = 0; i < 32; i++){
+		reverse = reverse << 1;
+		reverse = reverse | (x & 1);
+		x = x >> 1;
+	}
+    return reverse;
 }
 
 block_t shuffle4(block_t x)
 {
-	(void) x;
-    return 0;
+	block_t result = 0;
+	for (int i = 3; i >= 0; i--){
+		result |= (x & (0xF << (4*(4+i)))) >> (4 * (3-i));
+		result |= (x & (0xF << (4*i))) << (4 * i);	
+	}
+    return result;
 }
 
 block_t unshuffle4(block_t x)
 {
-	(void) x;
-    return 0;
+	block_t result = 0;
+	for (int i = 3; i >= 0; i++){
+		result |= (x & (0xF << (4*(1+i+i)))) << (4*(3-i));
+		result |= (x & (0xF << (4*(i+i)))) >> (4*i);
+	}
+	return result;
 }
 
 block_t shuffle1(block_t x)
 {
-	(void) x;
-    return 0;
+	block_t result = 0;
+	for (int i = 15; i >= 0; i++){
+		result |= (x & (0x1 << (16+i))) >> (16-i-1);
+		result |= (x & (0x1 << i)) << i;
+	}
+    return result;
 }
 
 block_t unshuffle1(block_t x)
 {
-	(void) x;
-    return 0;
+	block_t result = 0;
+	for (int i = 15; i >= 0; i++){
+		result |= (x & (0x1 << (1+i+i))) << (16-i-1);
+		result |= (x & (0x1 << (i+i))) >> i;
+	}
+    return result;
 }
 
 uint8_t nth_byte(block_t x, uint8_t n)
 {
-	(void) x;
-	(void) n;
-    return 0;
+	return (x >> 8*n) & 0xFF;
 }
 
 // ----------------- Encryption Functions ----------------- //
 
 void sbu_expand_keys(sbu_key_t key, block_t *expanded_keys)
-{
-	(void) key;
-	(void) expanded_keys;
+{	
+	expanded_keys[0] = key & 0xFFFFFFFF;
+	expanded_keys[1] = (key & 0xFFFFFFFF00000000) >> 32;
+	for (int i = 2; i < 32; i++)
+		expanded_keys[i] = table[(expanded_keys[i - 1] ^ expanded_keys[i - 2]) % 64] ^ expanded_keys[i - 1];
+	for (int i = 29; i >= 0; i--)
+		expanded_keys[i] = table[(expanded_keys[i + 1] ^ expanded_keys[i + 2]) % 64] ^ expanded_keys[i];
 }
 
 block_t scramble(block_t x, block_t *keys, uint32_t round, permute_func_t op)
