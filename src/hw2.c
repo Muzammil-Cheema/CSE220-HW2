@@ -20,28 +20,11 @@ Length or data_length is how many data values we need to hold in total
 
 //Packet Code:
 
-// //Take a char pointer and assigns 4 bytes of data, starting from where the ptr starts. The ptr is incremented 4 places. The order of data storage is based on the endianness. 
-// unsigned int set_data_32bit(const unsigned char* ptr, int endianness){
-// 	unsigned int value;
-// 	if (endianness){
-// 		value = (
-// 			(*ptr)		|
-// 			(*(ptr+1) << 8)	| 
-// 			(*(ptr+2) << 16)	|
-// 			(*(ptr+3) << 24)
-// 		);
-// 		ptr+=4;
-// 	} else {
-// 		value = (
-// 			(*(ptr) << 24)	|
-// 			(*(ptr+1) << 16)	| 
-// 			(*(ptr+2) << 8)	|
-// 			(*(ptr+3))
-// 		);
-// 		ptr+=4;
-// 	}
-// 	return value;
-// }
+//Increments a packet pointer. Assumes the pointer currently points at the first byte of a valid packet. 
+unsigned char* increment_pointer(unsigned char *pointer){
+	pointer += 3 + (4 * (((pointer[1] & 0x1F) << 5) | ((pointer[2] & 0xF8) >> 3)));
+	return pointer;
+}
 
 void print_packet(unsigned char packet[])
 {
@@ -86,7 +69,6 @@ void print_packet(unsigned char packet[])
 		printf("%x ", value);
 	}
 
-	// free(dataPtr);
 	dataPtr = NULL;
 }
 
@@ -96,7 +78,7 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 	unsigned char *original_packet_ptr = (unsigned char*) calloc(total_fragments, 3 + max_fragment_size);	//Packet array pointer that will be returned (pointer unchanged in this function)
 	unsigned char *packet_ptr = original_packet_ptr;
 
-	int data_index = 0;	//Index of the current data value we are reading. Used to create multiple packets with new data. 
+	int data_index = 0;	//Index of the current data value we are reading.
 	//For each packet...
 	for (int fragment_number = 0; fragment_number < total_fragments; fragment_number++, packet_ptr+=(3+max_fragment_size)){
 		unsigned short length = 0; //Equals the number of 32-bit values in a given payload. Stored in the header. 
@@ -120,65 +102,9 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 
 		//Sets the three header bytes for each packet
 		packet_ptr[0] = ((array_number & 0x3F) << 2) | ((fragment_number >> 3) & 0x3);
-		// printf("fragment_number: %d (binary: ", fragment_number);
-		// for (int i = 7; i >= 0; i--) {
-		// 	printf("%u", (fragment_number >> i) & 1);
-		// }
-		// printf(")\n");
-
-		// printf("length: %d (binary: ", length);
-		// for (int i = 15; i >= 0; i--) {  // length is at most 16 bits
-		// 	printf("%u", (length >> i) & 1);
-		// }
-		// printf(")\n");
 		packet_ptr[1] = ((fragment_number & 0x7) << 5) | ((length >> 5) & 0x1F);
-		// printf("header 2: %d (binary: ", packet_ptr[1]);
-		// for (int i = 7; i >= 0; i--) {  
-		// 	printf("%u", (packet_ptr[1] >> i) & 1);
-		// }
-		// printf(")\n");
-		// printf("FRAGMENT NUMBER: %d\n", fragment_number);
 		packet_ptr[2] = ((length & 0x1F) << 3) | 0 << 2 | endianness << 1 | (total_fragments == (fragment_number+1) ? 1 : 0);
-
-		// printf("HEADER 1: ");
-		// for (int i = 7; i >= 0; i--) {
-		// 	unsigned int bit = (packet_ptr[0] >> i) & 1;  // Shift the bit and mask to get the value (0 or 1)
-		// 	printf("%u", bit);
-		// }
-		// printf("\n");
-		// printf("HEADER 2: ");
-		// for (int i = 7; i >= 0; i--) {
-		// 	unsigned int bit = (packet_ptr[1] >> i) & 1;  // Shift the bit and mask to get the value (0 or 1)
-		// 	printf("%u", bit);
-		// }
-		// printf("\n");
-		// printf("HEADER 3: ");
-		// for (int i = 7; i >= 0; i--) {
-		// 	unsigned int bit = (packet_ptr[2] >> i) & 1;  // Shift the bit and mask to get the value (0 or 1)
-		// 	printf("%u", bit);
-		// }
-		// printf("\nPACKET NUMBER: %d\n", fragment_number);
-
-		// printf("ORIGINAL 1 %x\n", (unsigned int)original_packet_ptr[0]);
-		// printf("ORIGINAL 2 %x\n", (unsigned int)original_packet_ptr[1]);
-		// printf("ORIGINAL 3 %x\n", (unsigned int)original_packet_ptr[2]);
-		// printf("ORIGINAL 4 %x\n", (unsigned int)original_packet_ptr[3]);
-		// printf("ORIGINAL 5 %x\n", (unsigned int)original_packet_ptr[4]);
-		// printf("ORIGINAL 6 %x\n", (unsigned int)original_packet_ptr[5]);
-		// printf("ORIGINAL 7 %x\n", (unsigned int)original_packet_ptr[6]);
-		// printf("ORIGINAL 8 %x\n", (unsigned int)original_packet_ptr[7]);
-		// printf("ORIGINAL 9 %x\n", (unsigned int)original_packet_ptr[8]);
-		// printf("ORIGINAL 10 %x\n", (unsigned int)original_packet_ptr[9]);
-		// printf("ORIGINAL 11 %x\n", (unsigned int)original_packet_ptr[10]);
-		// printf("ORIGINAL 12 %x\n", (unsigned int)original_packet_ptr[11]);
-		// printf("ORIGINAL 13 %x\n", (unsigned int)original_packet_ptr[12]);
-		// printf("ORIGINAL 14 %x\n", (unsigned int)original_packet_ptr[13]);
-		// printf("ORIGINAL 15 %x\n", (unsigned int)original_packet_ptr[14]);
 	}
-
-	
-
-
 
 	//Nullify obsolete pointers
 	packet_ptr = NULL;
@@ -187,10 +113,90 @@ unsigned char* build_packets(int data[], int data_length, int max_fragment_size,
 
 int** create_arrays(unsigned char packets[], int array_count, int *array_lengths)
 {
-    (void) packets; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) array_count; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-	(void) array_lengths; //This line is only here to avoid compiler issues. Once you implement the function, please delete this line
-    return NULL;
+	int **return_array = (int**) calloc(array_count, sizeof(int*));	//Allocates array of int pointers
+	int **fragment_offsets = (int**) calloc(array_count, sizeof(int*));	//Tracks which index we start writing to in return_array[i][j]for a given fragment (j) in a given array (i). 
+
+
+	for (int i = 0; i < array_count; i++)	//Ensures array_lengths starts with all 0s. 
+		array_lengths[i] = 0;
+
+	int total_fragments = 0;	//The total number of packets in the packets[] array.
+	int lastCounter = 0;	//Counts how many last fragments are found. Used to find total_fragments
+	unsigned char* packet_ptr = packets;
+
+
+
+	while (lastCounter < array_count){	//Loop until we have found all the last fragments
+		if ((packet_ptr[2] & 1)){	//If packet is last 
+			total_fragments += (((packet_ptr[0] & 0x03) << 3) | ((packet_ptr[1] & 0xE0) >> 5)) + 1;	//Add fragment number plus one (0-indexed correction) to the total_fragments count. The calculated value is the number of fragments for this array. 
+			lastCounter++;
+		}
+		packet_ptr = increment_pointer(packet_ptr);	//Increments packet_ptr by the size of the current packet.
+	}
+
+	//Find the length of each array by obtaining the length value from each packet. In the loop, we need the array_number to know which array the current fragment belongs to.
+	packet_ptr = packets;
+	for (int i = 0; i < total_fragments; i++){
+		array_lengths[packet_ptr[0] >> 2] += ((packet_ptr[1] & 0x1F) << 5) | ((packet_ptr[2] & 0xF8) >> 3);	//Increases array_lengths[array_number] by the length value of the current packet. 
+		packet_ptr = increment_pointer(packet_ptr);
+	}
+
+	//Allocates exactly enough bytes to store each data value correctly in return_array and enough bytes to store the fragment offsets. 
+	for (int i = 0; i < array_count; i++){
+		return_array[i] = (int*) calloc(array_lengths[i], sizeof(int));
+		fragment_offsets[i] = (int*) calloc(array_lengths[i] - 1, sizeof(int));
+	}
+
+	//Determine the index that a given fragment of a given array should start writing to. The data from a fragment j of array i will start writing to the fragment_offsets[i][j-1]^th index of return_array[i].
+	packet_ptr = packets;
+	for (int i = 0; i < total_fragments; i++){
+		int array_num = packet_ptr[0] >> 2;
+		int frag_num = ((packet_ptr[0] & 0x03) << 3) | ((packet_ptr[1] & 0xE0) >> 5);
+		int length = (((packet_ptr[1] & 0x1F) << 5) | ((packet_ptr[2] & 0xF8) >> 3));
+		int last = (packet_ptr[2] & 1);
+
+		if (!last){
+			for (int j = frag_num; j < array_lengths[array_num]; j++){
+				fragment_offsets[array_num][j] += length;
+			}
+		}
+		
+		packet_ptr = increment_pointer(packet_ptr);
+	}
+
+
+
+
+	packet_ptr = packets;
+	//For each packet...
+	for (int packet = 0; packet < total_fragments; packet++){
+		int array_num = packet_ptr[0] >> 2;
+		int frag_num = ((packet_ptr[0] & 0x03) << 3) | ((packet_ptr[1] & 0xE0) >> 5);
+		int length = ((packet_ptr[1] & 0x1F) << 5) | ((packet_ptr[2] & 0xF8) >> 3);
+		int endian = (packet_ptr[2] & 0x02) >> 1;
+		//For each data value in this packet...
+		for(int data_index = 0; data_index < length; data_index++){
+			//Set return_array at [array_number of packet][array index to start at] to data_index^th data value from this packet based on the endianness of this packet. If frag_num == 0, then we start at return_array[array_num][0], else we start writing data at an offset determined by fragment_offsets. As data_index increments, the return_array's jth index increments. 
+			return_array[array_num][data_index + ((frag_num) ? fragment_offsets[array_num][frag_num-1] : 0)] 
+				= (endian) 
+				? 	
+					(packet_ptr[(4*data_index)+6]) << 24	| 
+					(packet_ptr[(4*data_index)+5]) << 16	|
+					(packet_ptr[(4*data_index)+4]) << 8		|
+					(packet_ptr[(4*data_index)+3])	
+				:
+					(packet_ptr[(4*data_index)+3]) << 24	| 
+					(packet_ptr[(4*data_index)+4]) << 16	|
+					(packet_ptr[(4*data_index)+5]) << 8		|
+					(packet_ptr[(4*data_index)+6]) 
+			;
+		}
+
+		packet_ptr = increment_pointer(packet_ptr);
+	}
+
+	packet_ptr = NULL;
+    return return_array;
 }
 
 
